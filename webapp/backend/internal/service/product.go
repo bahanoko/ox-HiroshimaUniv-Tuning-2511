@@ -20,29 +20,27 @@ func (s *ProductService) CreateOrders(ctx context.Context, userID int, items []m
 	var insertedOrderIDs []string
 
 	err := s.store.ExecTx(ctx, func(txStore *repository.Store) error {
-		itemsToProcess := make(map[int]int)
+		// 注文リストを構築
+		var ordersToInsert []model.Order
 		for _, item := range items {
-			if item.Quantity > 0 {
-				itemsToProcess[item.ProductID] = item.Quantity
+			for i := 0; i < item.Quantity; i++ {
+				ordersToInsert = append(ordersToInsert, model.Order{
+					UserID:    userID,
+					ProductID: item.ProductID,
+				})
 			}
 		}
-		if len(itemsToProcess) == 0 {
+
+		if len(ordersToInsert) == 0 {
 			return nil
 		}
 
-		for pID, quantity := range itemsToProcess {
-			for i := 0; i < quantity; i++ {
-				order := &model.Order{
-					UserID:    userID,
-					ProductID: pID,
-				}
-				orderID, err := txStore.OrderRepo.Create(ctx, order)
-				if err != nil {
-					return err
-				}
-				insertedOrderIDs = append(insertedOrderIDs, orderID)
-			}
+		// バルクINSERTで一括作成
+		orderIDs, err := txStore.OrderRepo.BulkCreate(ctx, ordersToInsert)
+		if err != nil {
+			return err
 		}
+		insertedOrderIDs = orderIDs
 		return nil
 	})
 
