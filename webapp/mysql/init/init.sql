@@ -43,5 +43,7 @@ CREATE TABLE `user_sessions` (
   `expires_at` DATETIME NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `session_uuid` (`session_uuid`),
+  INDEX idx_user_id (`user_id`),
+  INDEX idx_expires_at (`expires_at`),
   FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
 );
