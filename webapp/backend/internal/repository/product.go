@@ -9,6 +9,7 @@ type ProductRepository struct {
 	db DBTX
 }
 
+
 func NewProductRepository(db DBTX) *ProductRepository {
 	return &ProductRepository{db: db}
 }
@@ -18,10 +19,9 @@ func (r *ProductRepository) CountProducts(ctx context.Context, req model.ListReq
     var count int
     countQuery := `SELECT COUNT(*) FROM products`
     if req.Search != "" {
-        countQuery += " WHERE (name LIKE ? OR description LIKE ?)"
-        searchPattern := "%" + req.Search + "%"
-        countArgs := []interface{}{searchPattern, searchPattern}
-        err := r.db.GetContext(ctx, &count, countQuery, countArgs...)
+        countQuery += " WHERE MATCH(name, description) AGAINST(? IN BOOLEAN MODE)"
+        searchArg := req.Search + "*"
+        err := r.db.GetContext(ctx, &count, countQuery, searchArg)
         if err != nil {
             return 0, err
         }
@@ -44,9 +44,9 @@ func (r *ProductRepository) ListProducts(ctx context.Context, userID int, req mo
 	args := []interface{}{}
 
 	if req.Search != "" {
-		baseQuery += " WHERE (name LIKE ? OR description LIKE ?)"
-		searchPattern := "%" + req.Search + "%"
-		args = append(args, searchPattern, searchPattern)
+		baseQuery += " WHERE MATCH(name, description) AGAINST(? IN BOOLEAN MODE)"
+		searchArg := req.Search + "*"
+		args = append(args, searchArg)
 	}
 
 	total, err := r.CountProducts(ctx, req)
