@@ -33,6 +33,43 @@ func (r *OrderRepository) Create(ctx context.Context, order *model.Order) (strin
 	return fmt.Sprintf("%d", id), nil
 }
 
+// 複数の注文を一括で作成し、生成された注文IDのリストを返す
+func (r *OrderRepository) BulkCreate(ctx context.Context, orders []model.Order) ([]string, error) {
+	if len(orders) == 0 {
+		return []string{}, nil
+	}
+
+	// バルクINSERTのクエリを構築
+	valuesPlaceholder := strings.Repeat("(?, ?, 'shipping', NOW()),", len(orders))
+	valuesPlaceholder = valuesPlaceholder[:len(valuesPlaceholder)-1]
+	query := fmt.Sprintf("INSERT INTO orders (user_id, product_id, shipped_status, created_at) VALUES %s", valuesPlaceholder)
+
+	// パラメータを展開
+	args := make([]interface{}, 0, len(orders)*2)
+	for _, order := range orders {
+		args = append(args, order.UserID, order.ProductID)
+	}
+
+	result, err := r.db.ExecContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+
+	// 最初に挿入されたIDを取得
+	firstID, err := result.LastInsertId()
+	if err != nil {
+		return nil, err
+	}
+
+	// 連続したIDのリストを生成
+	orderIDs := make([]string, len(orders))
+	for i := range orders {
+		orderIDs[i] = fmt.Sprintf("%d", firstID+int64(i))
+	}
+
+	return orderIDs, nil
+}
+
 // 複数の注文IDのステータスを一括で更新
 // 主に配送ロボットが注文を引き受けた際に一括更新をするために使用
 func (r *OrderRepository) UpdateStatuses(ctx context.Context, orderIDs []int64, newStatus string) error {
