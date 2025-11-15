@@ -31,7 +31,9 @@ CREATE TABLE orders (
     created_at DATETIME NOT NULL,
     arrived_at DATETIME,
     FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
-    FOREIGN KEY (product_id) REFERENCES products(product_id) ON DELETE CASCADE
+    FOREIGN KEY (product_id) REFERENCES products(product_id) ON DELETE CASCADE,
+    INDEX idx_user_id (user_id),
+    INDEX idx_shipped_status (shipped_status)
 );
 
 CREATE TABLE `user_sessions` (
