@@ -38,7 +38,7 @@ func (s *RobotService) GenerateDeliveryPlan(ctx context.Context, robotID string,
 					orderIDs[i] = order.OrderID
 				}
 
-				if err := txStore.OrderRepo.UpdateStatuses(ctx, orderIDs, "delivering"); err != nil {
+				if err := txStore.OrderRepo.UpdateStatusesChunked(ctx, orderIDs, "delivering"); err != nil {
 					return err
 				}
 				log.Printf("Updated status to 'delivering' for %d orders", len(orderIDs))
