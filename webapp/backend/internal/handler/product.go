@@ -137,6 +137,9 @@ func (h *ProductHandler) GetImage(w http.ResponseWriter, r *http.Request) {
 	default:
 		contentType = "application/octet-stream"
 	}
+
+	// ブラウザキャッシュを有効化（1時間）
+	w.Header().Set("Cache-Control", "public, max-age=3600")
 	w.Header().Set("Content-Type", contentType)
 
 	data, err := os.ReadFile(fullPath)
