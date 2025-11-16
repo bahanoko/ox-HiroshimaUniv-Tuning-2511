@@ -11,7 +11,7 @@ services:
     environment:
       TZ: Asia/Tokyo
       DATABASE_URL: user:password@tcp(db:3306)/hiroshimauniv2511-db
-      TRACE_ENABLED: "false" # いらない時はfalse
+      TRACE_ENABLED: "true" # いらない時はfalse
       JAEGER_ENDPOINT: "http://jaeger:14268/api/traces"
       TRACE_SAMPLE_RATIO: "1.0"
       # OTEL_TRACES_SAMPLER: "always_off"
