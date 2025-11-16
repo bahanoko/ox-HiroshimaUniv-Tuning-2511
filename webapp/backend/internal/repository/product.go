@@ -3,18 +3,46 @@ package repository
 import (
 	"backend/internal/model"
 	"context"
+	"fmt"
+	"sync"
+	"time"
 )
 
+type countCacheEntry struct {
+	count int
+	time  time.Time
+}
+
 type ProductRepository struct {
-	db DBTX
+	db              DBTX
+	countCache      map[string]countCacheEntry
+	countCacheMutex sync.RWMutex
+	countCacheTTL   time.Duration
 }
 
 func NewProductRepository(db DBTX) *ProductRepository {
-	return &ProductRepository{db: db}
+	return &ProductRepository{
+		db:            db,
+		countCache:    make(map[string]countCacheEntry),
+		countCacheTTL: 60 * time.Second, // 60秒キャッシュ
+	}
 }
 
 // 商品の総数を取得する関数
 func (r *ProductRepository) CountProducts(ctx context.Context, req model.ListRequest) (int, error) {
+	// キャッシュキーを生成
+	cacheKey := fmt.Sprintf("count:%s", req.Search)
+
+	// キャッシュチェック
+	r.countCacheMutex.RLock()
+	if entry, exists := r.countCache[cacheKey]; exists {
+		if time.Since(entry.time) < r.countCacheTTL {
+			r.countCacheMutex.RUnlock()
+			return entry.count, nil
+		}
+	}
+	r.countCacheMutex.RUnlock()
+
 	var count int
 	countQuery := `SELECT COUNT(*) FROM products`
 	if req.Search != "" {
@@ -30,6 +58,15 @@ func (r *ProductRepository) CountProducts(ctx context.Context, req model.ListReq
 			return 0, err
 		}
 	}
+
+	// キャッシュに保存
+	r.countCacheMutex.Lock()
+	r.countCache[cacheKey] = countCacheEntry{
+		count: count,
+		time:  time.Now(),
+	}
+	r.countCacheMutex.Unlock()
+
 	return count, nil
 }
 
