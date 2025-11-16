@@ -166,19 +166,6 @@ func (r *OrderRepository) ListOrders(ctx context.Context, userID int, req model.
 		}
 	}
 
-	// COUNT クエリ
-	countQuery := fmt.Sprintf(`
-		SELECT COUNT(*)
-		FROM orders o
-		JOIN products p ON o.product_id = p.product_id
-		%s
-	`, whereClause)
-
-	var total int
-	if err := r.db.GetContext(ctx, &total, countQuery, args...); err != nil {
-		return nil, 0, err
-	}
-
 	// ORDER BY句の構築
 	var orderByClause string
 	switch req.SortField {
@@ -199,27 +186,57 @@ func (r *OrderRepository) ListOrders(ctx context.Context, userID int, req model.
 		sortOrder = "DESC"
 	}
 
-	// SELECT クエリ
-	selectQuery := fmt.Sprintf(`
-		SELECT
-			o.order_id,
-			o.product_id,
-			o.shipped_status,
-			o.created_at,
-			o.arrived_at,
-			p.name AS product_name
-		FROM orders o
-		JOIN products p ON o.product_id = p.product_id
-		%s
-		ORDER BY %s %s, o.order_id ASC
-		LIMIT ? OFFSET ?
-	`, whereClause, orderByClause, sortOrder)
-
-	selectArgs := append(args, req.PageSize, req.Offset)
-
+	// COUNTとSELECTを並列実行
+	var total int
 	var ordersRaw []orderRow
-	if err := r.db.SelectContext(ctx, &ordersRaw, selectQuery, selectArgs...); err != nil {
-		return nil, 0, err
+	var countErr, selectErr error
+
+	countDone := make(chan struct{})
+	selectDone := make(chan struct{})
+
+	// COUNT クエリを並列実行
+	go func() {
+		defer close(countDone)
+		countQuery := fmt.Sprintf(`
+			SELECT COUNT(*)
+			FROM orders o
+			JOIN products p ON o.product_id = p.product_id
+			%s
+		`, whereClause)
+		countErr = r.db.GetContext(ctx, &total, countQuery, args...)
+	}()
+
+	// SELECT クエリを並列実行
+	go func() {
+		defer close(selectDone)
+		selectQuery := fmt.Sprintf(`
+			SELECT
+				o.order_id,
+				o.product_id,
+				o.shipped_status,
+				o.created_at,
+				o.arrived_at,
+				p.name AS product_name
+			FROM orders o
+			JOIN products p ON o.product_id = p.product_id
+			%s
+			ORDER BY %s %s, o.order_id ASC
+			LIMIT ? OFFSET ?
+		`, whereClause, orderByClause, sortOrder)
+
+		selectArgs := append(args, req.PageSize, req.Offset)
+		selectErr = r.db.SelectContext(ctx, &ordersRaw, selectQuery, selectArgs...)
+	}()
+
+	// 両方の完了を待つ
+	<-countDone
+	<-selectDone
+
+	if countErr != nil {
+		return nil, 0, countErr
+	}
+	if selectErr != nil {
+		return nil, 0, selectErr
 	}
 
 	// モデルに変換
