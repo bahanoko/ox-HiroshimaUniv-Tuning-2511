@@ -80,7 +80,8 @@ func selectOrdersForDelivery(ctx context.Context, orders []model.Order, robotID 
 	n = len(orders)
 
 	// If DP table would be too large, fallback to greedy heuristic
-	const maxCells = 5_000_000 // threshold for n * capacity
+	// 閾値を下げて高速なGreedyアルゴリズムを優先
+	const maxCells = 500_000 // threshold for n * capacity
 	if int64(n)*int64(robotCapacity) > maxCells {
 		// Greedy by value/weight ratio
 		type itemWithRatio struct {
