@@ -85,6 +85,40 @@ func (r *OrderRepository) UpdateStatuses(ctx context.Context, orderIDs []int64, 
 	return err
 }
 
+// UpdateStatusesChunked は大量注文でも安全にステータスを更新する
+func (r *OrderRepository) UpdateStatusesChunked(ctx context.Context, orderIDs []int64, newStatus string) error {
+	if len(orderIDs) == 0 {
+		return nil
+	}
+
+	const chunkSize = 1000 // 一度に処理するID数
+	for i := 0; i < len(orderIDs); i += chunkSize {
+		end := i + chunkSize
+		if end > len(orderIDs) {
+			end = len(orderIDs)
+		}
+		chunk := orderIDs[i:end]
+
+		query, args, err := sqlx.In(
+			"UPDATE orders SET shipped_status = ? WHERE order_id IN (?)",
+			newStatus,
+			chunk,
+		)
+		if err != nil {
+			return err
+		}
+
+		query = r.db.Rebind(query)
+
+		// 実行
+		if _, err := r.db.ExecContext(ctx, query, args...); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // 配送中(shipped_status:shipping)の注文一覧を取得
 func (r *OrderRepository) GetShippingOrders(ctx context.Context) ([]model.Order, error) {
 	var orders []model.Order
