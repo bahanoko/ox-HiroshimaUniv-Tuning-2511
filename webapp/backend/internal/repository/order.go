@@ -70,6 +70,13 @@ func (r *OrderRepository) BulkCreate(ctx context.Context, orders []model.Order) 
 	return orderIDs, nil
 }
 
+// 単一の注文のステータスを更新
+func (r *OrderRepository) UpdateStatus(ctx context.Context, orderID int64, newStatus string) error {
+	query := "UPDATE orders SET shipped_status = ? WHERE order_id = ?"
+	_, err := r.db.ExecContext(ctx, query, newStatus, orderID)
+	return err
+}
+
 // 複数の注文IDのステータスを一括で更新
 // 主に配送ロボットが注文を引き受けた際に一括更新をするために使用
 func (r *OrderRepository) UpdateStatuses(ctx context.Context, orderIDs []int64, newStatus string) error {
