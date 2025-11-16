@@ -17,7 +17,3 @@ ADD INDEX idx_name (name);
 ALTER TABLE users
 ADD INDEX idx_user_name (user_name);
 
-ALTER TABLE products
-ADD FULLTEXT INDEX idx_ft_name_desc (name, description)
-WITH PARSER ngram;
-
